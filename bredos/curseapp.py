@@ -7,6 +7,137 @@ DRYRUN = False
 APP_NAME = "BredOS"
 enabled = False
 
+# Theming, update from app
+primary = 166  # ANSI 256 Colors
+primary_fallback = 7  # TTY 8 Colors
+secondary = 166  # ANSI 256 Colors
+secondary_fallback = 7  # TTY 8 Colors
+background = None  # ANSI 256 Colors
+background_fallback = 0  # ANSI 8 Colors
+
+# Color pair indexes
+PRIMARY_PAIR = 10
+SECONDARY_PAIR = 11
+BACKGROUND_PAIR = 12
+
+
+# Primary colors follow ANSI conventions.
+# Follow: https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#256-colors
+
+# Fallback colors apply in TTY and other sus terminals.
+# 0 - Black
+# 1 - Green
+# 2 - White
+# 3 - Blue
+# 4 - Magenta
+# 5 - Yellow
+# 6 - Cyan
+# 7 - Red
+
+
+def load_colors() -> None:
+    global stdscr
+    if primary is not None and not isinstance(primary, int):
+        raise TypeError("Primary color must be an int (0-255)")
+    if not isinstance(primary_fallback, int):
+        raise TypeError("Primary fallback color must be an int (0-7)")
+    if secondary is not None and not isinstance(secondary, int):
+        raise TypeError("Secondary color must be an int (0-255)")
+    if not isinstance(secondary_fallback, int):
+        raise TypeError("Secondary fallback color must be an int (0-7)")
+    if background is not None and not isinstance(background, int):
+        raise TypeError("Background color must be an int (0-255)")
+    if not isinstance(background_fallback, int):
+        raise TypeError("Background fallback color must be an int (0-7)")
+
+    def ttycolor(cid: int):
+        if cid == 0:
+            return curses.COLOR_BLACK
+        elif cid == 1:
+            return curses.COLOR_GREEN
+        elif cid == 2:
+            return curses.COLOR_WHITE
+        elif cid == 3:
+            return curses.COLOR_BLUE
+        elif cid == 4:
+            return curses.COLOR_MAGENTA
+        elif cid == 5:
+            return curses.COLOR_YELLOW
+        elif cid == 6:
+            return curses.COLOR_CYAN
+        else:
+            return curses.COLOR_RED
+
+    curses.start_color()
+    supports_default_colors = False
+    supports_256_colors = False
+
+    try:
+        curses.use_default_colors()
+        supports_default_colors = True
+        max_colors = curses.COLORS
+        if max_colors >= 256:
+            supports_256_colors = True
+    except curses.error:
+        # Fallback: terminal doesn't support default colors
+        max_colors = 8
+
+    # Initialize basic color pairs
+    for i in range(min(max_colors, 8)):
+        # Foreground i, background default (-1) or black (0)
+        bg = -1 if supports_default_colors else 0
+        try:
+            curses.init_pair(i + 1, i, bg)
+        except curses.error:
+            # Ignore errors if fewer colors supported
+            pass
+
+    # Setup primary color
+    try:
+        if supports_256_colors and primary is not None:
+            curses.init_pair(PRIMARY_PAIR, primary, -1 if supports_default_colors else 0)
+        else:
+            curses.init_pair(PRIMARY_PAIR, ttycolor(primary_fallback), -1 if supports_default_colors else 0)
+    except curses.error:
+        # Fallback to a safe color
+        try:
+            curses.init_pair(PRIMARY_PAIR, curses.COLOR_WHITE, -1 if supports_default_colors else 0)
+        except:
+            pass
+
+    # Setup secondary color
+    try:
+        if supports_256_colors and secondary is not None:
+            curses.init_pair(SECONDARY_PAIR, secondary, -1 if supports_default_colors else 0)
+        else:
+            curses.init_pair(SECONDARY_PAIR, ttycolor(secondary_fallback), -1 if supports_default_colors else 0)
+    except curses.error:
+        # Fallback to a safe color
+        try:
+            curses.init_pair(SECONDARY_PAIR, curses.COLOR_CYAN, -1 if supports_default_colors else 0)
+        except:
+            pass
+
+    # Setup background color
+    bg_color = -1 if supports_default_colors else 0
+    fg_color = curses.COLOR_WHITE  # Default foreground
+
+    try:
+        if supports_256_colors and background is not None:
+            bg_color = background
+            curses.init_pair(BACKGROUND_PAIR, fg_color, bg_color)
+        else:
+            bg_color = ttycolor(background_fallback)
+            curses.init_pair(BACKGROUND_PAIR, fg_color, bg_color)
+    except curses.error:
+        try:
+            curses.init_pair(BACKGROUND_PAIR, fg_color, 0)  # Black background fallback
+        except:
+            pass
+
+    # Apply the background color
+    stdscr.bkgd(" ", curses.color_pair(PRIMARY_PAIR))
+
 
 def detect_pos(timeout=1.0):
     """
@@ -124,24 +255,25 @@ def _draw_sidebar(stdscr, sidebar, sidebar_width, maxx, maxy):
 
     # Draw vertical separator
     for y in range(3, maxy - 1):
-        stdscr.addch(y, sidebar_width + 1, "│")
+        stdscr.addch(y, sidebar_width + 1, "│", curses.color_pair(SECONDARY_PAIR))
 
     # Draw horizontal separator line under title
-    stdscr.addch(2, 0, "├")
-    stdscr.addch(2, maxx - 1, "┤")
-    stdscr.addch(y + 1, sidebar_width + 1, "┴")
+    stdscr.addch(2, 0, "├", curses.color_pair(SECONDARY_PAIR))
+    stdscr.addch(2, maxx - 1, "┤", curses.color_pair(SECONDARY_PAIR))
+    stdscr.addch(y + 1, sidebar_width + 1, "┴", curses.color_pair(SECONDARY_PAIR))
     separator_line = "─" * (maxx - 2)
-    stdscr.addstr(2, 1, separator_line)
-    stdscr.addch(2, sidebar_width + 1, "┬")
+    stdscr.addstr(2, 1, separator_line, curses.color_pair(SECONDARY_PAIR))
+    stdscr.addch(2, sidebar_width + 1, "┬", curses.color_pair(SECONDARY_PAIR))
 
     # Draw sidebar items
     y = 3
     for item, checked in sidebar.items():
         if y >= maxy - 2:  # Don't draw beyond available space
             break
-        checkbox = "- [x]" if checked else "- [ ]"
-        sidebar_text = f"{checkbox} {item}"
+        sidebar_text = f"- [ ] {item}"
         stdscr.addstr(y, 2, sidebar_text[: sidebar_width - 2])
+        if checked:
+            stdscr.addch(y, 5, "x", curses.color_pair(SECONDARY_PAIR))
         y += 1
 
 
@@ -238,7 +370,7 @@ def confirm(text: list, label: str = None, sidebar: dict = None) -> bool:
                         elif dat in ["n", "N"]:
                             return False
                     except (KeyboardInterrupt, EOFError):
-                        pass
+                        print()
 
                 return False  # Magical fallthrough
 
@@ -582,9 +714,9 @@ def text_input(
 
 
 def draw_border() -> None:
-    stdscr.attron(curses.color_pair(1))
+    stdscr.attron(curses.color_pair(SECONDARY_PAIR))
     stdscr.border()
-    stdscr.attroff(curses.color_pair(1))
+    stdscr.attroff(curses.color_pair(SECONDARY_PAIR))
 
 
 def wait_clear(timeout: float = 0.2) -> None:
@@ -729,29 +861,5 @@ def init() -> None:
     if enabled:
         return
     resume()
-    curses.start_color()
-    try:
-        curses.use_default_colors()
-        max_colors = curses.COLORS
-    except curses.error:
-        # Fallback: terminal doesn't support default colors
-        max_colors = 16
-
-    max_colors = max(max_colors, 7)
-
-    for i in range(min(max_colors, 7)):
-        # Foreground i, background default (-1)
-        try:
-            curses.init_pair(i + 1, i, -1)
-        except curses.error:
-            # Ignore errors if fewer colors supported
-            pass
-    try:
-        curses.init_pair(1, 166, -1)
-    except:
-        try:
-            curses.init_pair(1, curses.COLOR_RED, -1)
-        except:
-            pass
-    stdscr.bkgd(" ", curses.color_pair(1))
+    load_colors()
     stdscr.clear()
