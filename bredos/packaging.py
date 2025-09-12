@@ -363,31 +363,54 @@ def install_packages(
         logger.debug(f"Running command: {cmd}")
 
         # Use elevator to run the command with elevated privileges
-        proc = elevator.run(cmd)
+        try:
+            proc = elevator.run(cmd)
 
-        # Process output and check for errors
-        output = ""
-        for line in proc.stdout:
-            output += line
+            # Read output safely
+            output = []
+            try:
+                # Read the output line by line instead of iterating directly
+                while True:
+                    line = proc.stdout.readline()
+                    if not line:
+                        break
+                    output.append(line)
+            except KeyboardInterrupt:
+                logger.warning("Installation interrupted by user")
+                try:
+                    proc.kill()
+                except:
+                    pass
+                raise PackageOperationError("Package installation was interrupted")
 
-        proc.wait()
+            # Wait for process to complete
+            proc.wait()
 
-        if proc.returncode != 0:
-            # Handle package not found errors specifically
-            if "target not found" in output:
-                missing_pkgs = []
-                for line in output.splitlines():
-                    if "target not found:" in line:
-                        missing_pkgs.append(line.split(":", 1)[1].strip())
+            # Join output lines
+            output_text = "".join(output)
 
-                if missing_pkgs:
-                    raise PackageNotFoundError(
-                        f"Package(s) not found: {', '.join(missing_pkgs)}"
-                    )
+            if proc.returncode != 0:
+                # Handle package not found errors specifically
+                if "target not found" in output_text:
+                    missing_pkgs = []
+                    for line in output_text.splitlines():
+                        if "target not found:" in line:
+                            missing_pkgs.append(line.split(":", 1)[1].strip())
 
-            raise PackageOperationError(f"Failed to install packages: {output}")
+                    if missing_pkgs:
+                        raise PackageNotFoundError(
+                            f"Package(s) not found: {', '.join(missing_pkgs)}"
+                        )
 
-        return True
+                raise PackageOperationError(f"Failed to install packages: {output_text}")
+
+            return True
+
+        except KeyboardInterrupt:
+            # Handle user interruption gracefully
+            logger.warning("Installation interrupted by user")
+            raise PackageOperationError("Package installation was interrupted")
+
     except PackageNotFoundError:
         raise
     except PackageOperationError:
@@ -452,19 +475,42 @@ def remove_packages(
         logger.debug(f"Running command: {cmd}")
 
         # Use elevator to run the command with elevated privileges
-        proc = elevator.run(cmd)
+        try:
+            proc = elevator.run(cmd)
 
-        # Process output and check for errors
-        output = ""
-        for line in proc.stdout:
-            output += line
+            # Read output safely
+            output = []
+            try:
+                # Read the output line by line instead of iterating directly
+                while True:
+                    line = proc.stdout.readline()
+                    if not line:
+                        break
+                    output.append(line)
+            except KeyboardInterrupt:
+                logger.warning("Package removal interrupted by user")
+                try:
+                    proc.kill()
+                except:
+                    pass
+                raise PackageOperationError("Package removal was interrupted")
 
-        proc.wait()
+            # Wait for process to complete
+            proc.wait()
 
-        if proc.returncode != 0:
-            raise PackageOperationError(f"Failed to remove packages: {output}")
+            # Join output lines
+            output_text = "".join(output)
 
-        return True
+            if proc.returncode != 0:
+                raise PackageOperationError(f"Failed to remove packages: {output_text}")
+
+            return True
+
+        except KeyboardInterrupt:
+            # Handle user interruption gracefully
+            logger.warning("Package removal interrupted by user")
+            raise PackageOperationError("Package removal was interrupted")
+
     except PackageNotFoundError:
         raise
     except PackageOperationError:
@@ -499,19 +545,42 @@ def update_system(
         logger.debug(f"Running command: {cmd}")
 
         # Use elevator to run the command with elevated privileges
-        proc = elevator.run(cmd)
+        try:
+            proc = elevator.run(cmd)
 
-        # Process output and check for errors
-        output = ""
-        for line in proc.stdout:
-            output += line
+            # Read output safely
+            output = []
+            try:
+                # Read the output line by line instead of iterating directly
+                while True:
+                    line = proc.stdout.readline()
+                    if not line:
+                        break
+                    output.append(line)
+            except KeyboardInterrupt:
+                logger.warning("System update interrupted by user")
+                try:
+                    proc.kill()
+                except:
+                    pass
+                raise PackageOperationError("System update was interrupted")
 
-        proc.wait()
+            # Wait for process to complete
+            proc.wait()
 
-        if proc.returncode != 0:
-            raise PackageOperationError(f"Failed to update system: {output}")
+            # Join output lines
+            output_text = "".join(output)
 
-        return True
+            if proc.returncode != 0:
+                raise PackageOperationError(f"Failed to update system: {output_text}")
+
+            return True
+
+        except KeyboardInterrupt:
+            # Handle user interruption gracefully
+            logger.warning("System update interrupted by user")
+            raise PackageOperationError("System update was interrupted")
+
     except Exception as e:
         error_msg = f"Failed to update system: {e}"
         logger.error(error_msg)
@@ -536,19 +605,42 @@ def refresh_databases(
         logger.debug(f"Running command: {cmd}")
 
         # Use elevator to run the command with elevated privileges
-        proc = elevator.run(cmd)
+        try:
+            proc = elevator.run(cmd)
 
-        # Process output and check for errors
-        output = ""
-        for line in proc.stdout:
-            output += line
+            # Read output safely
+            output = []
+            try:
+                # Read the output line by line instead of iterating directly
+                while True:
+                    line = proc.stdout.readline()
+                    if not line:
+                        break
+                    output.append(line)
+            except KeyboardInterrupt:
+                logger.warning("Database refresh interrupted by user")
+                try:
+                    proc.kill()
+                except:
+                    pass
+                raise PackageOperationError("Database refresh was interrupted")
 
-        proc.wait()
+            # Wait for process to complete
+            proc.wait()
 
-        if proc.returncode != 0:
-            raise PackageOperationError(f"Failed to refresh databases: {output}")
+            # Join output lines
+            output_text = "".join(output)
 
-        return True
+            if proc.returncode != 0:
+                raise PackageOperationError(f"Failed to refresh databases: {output_text}")
+
+            return True
+
+        except KeyboardInterrupt:
+            # Handle user interruption gracefully
+            logger.warning("Database refresh interrupted by user")
+            raise PackageOperationError("Database refresh was interrupted")
+
     except Exception as e:
         error_msg = f"Failed to refresh databases: {e}"
         logger.error(error_msg)
