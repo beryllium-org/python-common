@@ -74,7 +74,14 @@ def load_colors() -> None:
 
     try:
         curses.use_default_colors()
-        supports_default_colors = True
+        # Test if -1 is actually supported
+        try:
+            curses.init_pair(100, curses.COLOR_WHITE, -1)  # Test pair
+            supports_default_colors = True
+        except curses.error:
+            # -1 is not actually supported despite use_default_colors() succeeding
+            supports_default_colors = False
+
         max_colors = curses.COLORS
         if max_colors >= 256:
             supports_256_colors = True
@@ -88,33 +95,54 @@ def load_colors() -> None:
         bg = -1 if supports_default_colors else 0
         try:
             curses.init_pair(i + 1, i, bg)
-        except curses.error:
-            # Ignore errors if fewer colors supported
-            pass
+        except:
+            # If we get an error, try with bg=0 even if we thought default colors were supported
+            if supports_default_colors:
+                try:
+                    curses.init_pair(i + 1, i, 0)
+                except:
+                    pass
+            pass  # Ignore errors if fewer colors supported
 
     # Setup primary color
     try:
         if supports_256_colors and primary is not None:
-            curses.init_pair(PRIMARY_PAIR, primary, -1 if supports_default_colors else 0)
+            curses.init_pair(
+                PRIMARY_PAIR, primary, -1 if supports_default_colors else 0
+            )
         else:
-            curses.init_pair(PRIMARY_PAIR, ttycolor(primary_fallback), -1 if supports_default_colors else 0)
+            curses.init_pair(
+                PRIMARY_PAIR,
+                ttycolor(primary_fallback),
+                -1 if supports_default_colors else 0,
+            )
     except curses.error:
         # Fallback to a safe color
         try:
-            curses.init_pair(PRIMARY_PAIR, curses.COLOR_WHITE, -1 if supports_default_colors else 0)
+            curses.init_pair(
+                PRIMARY_PAIR, curses.COLOR_WHITE, -1 if supports_default_colors else 0
+            )
         except:
             pass
 
     # Setup secondary color
     try:
         if supports_256_colors and secondary is not None:
-            curses.init_pair(SECONDARY_PAIR, secondary, -1 if supports_default_colors else 0)
+            curses.init_pair(
+                SECONDARY_PAIR, secondary, -1 if supports_default_colors else 0
+            )
         else:
-            curses.init_pair(SECONDARY_PAIR, ttycolor(secondary_fallback), -1 if supports_default_colors else 0)
+            curses.init_pair(
+                SECONDARY_PAIR,
+                ttycolor(secondary_fallback),
+                -1 if supports_default_colors else 0,
+            )
     except curses.error:
         # Fallback to a safe color
         try:
-            curses.init_pair(SECONDARY_PAIR, curses.COLOR_CYAN, -1 if supports_default_colors else 0)
+            curses.init_pair(
+                SECONDARY_PAIR, curses.COLOR_CYAN, -1 if supports_default_colors else 0
+            )
         except:
             pass
 
