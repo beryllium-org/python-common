@@ -78,7 +78,7 @@ def load_colors() -> None:
         try:
             curses.init_pair(100, curses.COLOR_WHITE, -1)  # Test pair
             supports_default_colors = True
-        except curses.error:
+        except:
             # -1 is not actually supported despite use_default_colors() succeeding
             supports_default_colors = False
 
@@ -116,7 +116,7 @@ def load_colors() -> None:
                 ttycolor(primary_fallback),
                 -1 if supports_default_colors else 0,
             )
-    except curses.error:
+    except:
         # Fallback to a safe color
         try:
             curses.init_pair(
@@ -137,7 +137,7 @@ def load_colors() -> None:
                 ttycolor(secondary_fallback),
                 -1 if supports_default_colors else 0,
             )
-    except curses.error:
+    except:
         # Fallback to a safe color
         try:
             curses.init_pair(
@@ -157,7 +157,7 @@ def load_colors() -> None:
         else:
             bg_color = ttycolor(background_fallback)
             curses.init_pair(BACKGROUND_PAIR, fg_color, bg_color)
-    except curses.error:
+    except:
         try:
             curses.init_pair(BACKGROUND_PAIR, fg_color, 0)  # Black background fallback
         except:
