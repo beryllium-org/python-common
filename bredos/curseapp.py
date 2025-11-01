@@ -347,7 +347,7 @@ def message(
                     stdscr.addstr(3 + i, content_x, line[:content_width])
 
                 if not prompt:
-                    stdscr.refresh()
+                    refresh()
                     return
 
                 stdscr.attron(curses.A_REVERSE)
@@ -358,7 +358,7 @@ def message(
                     + " Press Enter to continue ",
                 )
                 stdscr.attroff(curses.A_REVERSE)
-                stdscr.refresh()
+                refresh()
 
                 key = stdscr.getch()
                 if key in (ord("\n"), curses.KEY_ENTER):
@@ -457,7 +457,7 @@ def confirm(text: list, label: str = None, sidebar: dict = None) -> bool:
                 stdscr.addstr(maxy - 2, content_x, prompt_line)
                 stdscr.attroff(curses.A_REVERSE)
 
-                stdscr.refresh()
+                refresh()
                 try:
                     key = stdscr.getch()
                 except KeyboardInterrupt:
@@ -593,7 +593,7 @@ def selector(
                         else curses.A_NORMAL
                     )
                     stdscr.addnstr(y, content_x, text, content_width, attr)
-                stdscr.refresh()
+                refresh()
                 return filtered
 
             while True:
@@ -700,7 +700,7 @@ def text_input(
                 )
 
                 stdscr.move(start_y + len(prompt), content_x + 2 + cursor)
-                stdscr.refresh()
+                refresh()
 
             while True:
                 draw()
@@ -769,7 +769,23 @@ def wait_clear(timeout: float = 0.2) -> None:
     stdscr.nodelay(False)
 
 
+def clear() -> None:
+    """
+    Clear the screen, reset cursor and debounce.
+    """
+    stdscr.clear()
+    curses.curs_set(0)
+    wait_clear()
+
+
+def refresh() -> None:
+    stdscr.refresh()
+
+
 def clear_line(y) -> None:
+    """
+    Move to line y and clear it.
+    """
     stdscr.move(y, 0)
     stdscr.clrtoeol()
 
@@ -793,7 +809,7 @@ def draw_list(title: str, options: list, selected: int, special: bool = False) -
         else:
             stdscr.addstr(y, x, option)
 
-    stdscr.refresh()
+    refresh()
 
 
 def draw_menu(title: str, options: list):
@@ -843,7 +859,40 @@ def draw_menu(title: str, options: list):
             pass
 
 
+def draw_custom(commands: list) -> None:
+    """
+    Bulk draw commands with shortcuts, useful for drawing views.
+
+    Accepted commands:
+     function: Executes passed function without parameters.
+     list: [-1, x, y, z], direct draw to collumn x, row y, data z, reverse filter.
+     list: [0, x, y, z], direct draw to collumn x, row y, data z.
+     list: [1, y], clear line y.
+     list: [2, x, y], move cursor to collumn x, row y.
+     list: [3, t], sleep t seconds.
+    """
+    for cmd in commands:
+        if isinstance(cmd, list):
+            if not cmd[0]:
+                stdscr.addstr(cmd[2], cmd[1], cmd[3])
+            elif cmd[0] == -1:
+                stdscr.attron(curses.A_REVERSE)
+                stdscr.addstr(cmd[2], cmd[1], cmd[3])
+                stdscr.attroff(curses.A_REVERSE)
+            elif cmd[0] == 1:
+                clear_line(cmd[1])
+            elif cmd[0] == 2:
+                stdscr.move(cmd[2], cmd[1])
+            elif cmd[0] == 3:
+                time.sleep(cmd[1])
+        else:  # Assume function.
+            cmd()
+
+
 def menu(title: str, actions: dict[str, callable], back: str = "Go Back") -> None:
+    """
+    Draw, execute and return the result with menu ui.
+    """
     options = list(actions.keys()) + [back]
 
     while True:
@@ -852,7 +901,7 @@ def menu(title: str, actions: dict[str, callable], back: str = "Go Back") -> Non
             return
 
         stdscr.clear()
-        stdscr.refresh()
+        refresh()
 
         action_key = options[selection]
         func = actions.get(action_key)
@@ -861,12 +910,17 @@ def menu(title: str, actions: dict[str, callable], back: str = "Go Back") -> Non
 
 
 def suspend() -> None:
+    """
+    Pause curseapp rendering, toggling framebuffer back to the original one temporarily.
+
+    Use when you run cli apps with output.
+    """
     global enabled
     if not enabled:
         return
     enabled = False
     stdscr.clear()
-    stdscr.refresh()
+    refresh()
     curses.nocbreak()
     stdscr.keypad(False)
     curses.echo()
@@ -874,6 +928,9 @@ def suspend() -> None:
 
 
 def resume() -> None:
+    """
+    Call once you wanna begin drawing again, after calling suspend()
+    """
     global stdscr, enabled
     if enabled:
         return
@@ -885,6 +942,9 @@ def resume() -> None:
 
 
 def init() -> None:
+    """
+    Call once at the start to initialize.
+    """
     global stdscr, enabled
     if enabled:
         return
