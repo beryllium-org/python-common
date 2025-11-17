@@ -28,6 +28,7 @@ handler = None
 
 dryrun = False if "DO_DRYRUN" not in os.listdir() else True
 
+
 def setup_logging(
     logger_name: str,
     log_dir: str,
@@ -152,6 +153,7 @@ def lp(message, mode="info") -> None:
         LogMessage.Exception(message).write(logging_handler=handler)
     else:
         raise ValueError("Invalid mode.")
+
 
 def post_run_cmd(info, exitcode) -> None:
     if exitcode:

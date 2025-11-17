@@ -139,6 +139,7 @@ def debounce(wait):
 
     return decorator
 
+
 def time_fn(func: Callable) -> Callable:
     @wraps(func)
     def wrapped(*args, **kwargs) -> Any:
@@ -150,6 +151,7 @@ def time_fn(func: Callable) -> Callable:
 
     return wrapped
 
+
 def catch_exceptions(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -160,6 +162,7 @@ def catch_exceptions(func):
             raise e
 
     return wrapper
+
 
 def detect_device() -> str:
     """
@@ -180,6 +183,7 @@ def detect_device() -> str:
                 return product_name_file.read().rstrip("\n")
         except FileNotFoundError:
             return "unknown"
+
 
 def detect_session_configuration() -> dict:
     """

@@ -225,7 +225,9 @@ def search_packages(
                 if name_match or desc_match:
                     seen_pkgs.add(pkg.name)
                     is_installed = pkg.name in installed_pkgs
-                    installed_version = installed_pkgs[pkg.name].version if is_installed else None
+                    installed_version = (
+                        installed_pkgs[pkg.name].version if is_installed else None
+                    )
 
                     results.append(
                         {
@@ -402,7 +404,9 @@ def install_packages(
                             f"Package(s) not found: {', '.join(missing_pkgs)}"
                         )
 
-                raise PackageOperationError(f"Failed to install packages: {output_text}")
+                raise PackageOperationError(
+                    f"Failed to install packages: {output_text}"
+                )
 
             return True
 
@@ -523,7 +527,10 @@ def remove_packages(
 
 
 def update_system(
-    handle: pyalpm.Handle = None, sysroot: str = "/", no_confirm: bool = False, force: bool = False
+    handle: pyalpm.Handle = None,
+    sysroot: str = "/",
+    no_confirm: bool = False,
+    force: bool = False,
 ) -> bool:
     """Upgrade all packages to their latest available versions."""
     try:
@@ -632,7 +639,9 @@ def refresh_databases(
             output_text = "".join(output)
 
             if proc.returncode != 0:
-                raise PackageOperationError(f"Failed to refresh databases: {output_text}")
+                raise PackageOperationError(
+                    f"Failed to refresh databases: {output_text}"
+                )
 
             return True
 
