@@ -932,6 +932,9 @@ def draw_list(title: str, options: list, selected: int, special: bool = False) -
 
     h, w = detect_size()
     for idx, option in enumerate(options):
+        # Prevent drawing outside the screen
+        if 3 + idx >= h - 1:
+            break
         x = 4
         y = 3 + idx
         clear_line(y)
@@ -952,8 +955,7 @@ def draw_list(title: str, options: list, selected: int, special: bool = False) -
 def draw_menu(title: str, options: list):
     curses.curs_set(0)
     current_row = 0
-    wait_clear()
-    stdscr.clear()
+    clear()
 
     while True:
         try:
@@ -964,7 +966,10 @@ def draw_menu(title: str, options: list):
             )
             key = stdscr.getch()
 
-            if key == curses.KEY_UP:
+            if key == curses.KEY_RESIZE:
+                clear()
+                continue
+            elif key == curses.KEY_UP:
                 if current_row > 0:
                     current_row -= 1
                 else:
