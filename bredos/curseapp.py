@@ -167,9 +167,9 @@ def load_colors() -> None:
     stdscr.bkgd(" ", curses.color_pair(PRIMARY_PAIR))
 
 
-def detect_pos(timeout=1.0):
+def detect_pos(timeout=0.3) -> list:
     """
-    Detect cursor position. Returns [row, col] or None if failed.
+    Detect cursor position. Returns [row, col].
     Works in interactive POSIX terminals.
 
     BeOS CircuitPython code ported for desktop Python.
@@ -204,7 +204,7 @@ def detect_pos(timeout=1.0):
     return [0, 0]
 
 
-def detect_size(timeout=0.3):
+def detect_size(timeout=0.3) -> list:
     """
     Detect terminal size by moving cursor to bottom-right and querying position.
     Returns [rows, cols] or None if failed.
@@ -212,42 +212,55 @@ def detect_size(timeout=0.3):
     BeOS CircuitPython code ported for desktop Python.
     Will work even in hell.
     """
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setcbreak(fd)
-        # Save position
-        sys.stdout.write("\x1b[s")
-        # Move cursor to huge position
-        sys.stdout.write("\x1b[999;999H")
-        # Request position
-        sys.stdout.write("\x1b[6n")
-        sys.stdout.flush()
+    res = [24, 80]
+    cur = [0, 0]
+    delay = False
+    while True:
+        if cur == res:
+            return res
+        elif delay:
+            time.sleep(0.005)
+        else:
+            delay = True
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setcbreak(fd)
+            # Save position
+            sys.stdout.write("\x1b[s")
+            # Move cursor to huge position
+            sys.stdout.write("\x1b[999;999H")
+            # Request position
+            sys.stdout.write("\x1b[6n")
+            sys.stdout.flush()
 
-        buf = ""
-        start = time.monotonic()
-        while time.monotonic() - start < timeout:
-            if os.read(fd, 1) == b"\x1b":
-                if os.read(fd, 1) == b"[":
-                    while True:
-                        ch = os.read(fd, 1).decode()
-                        buf += ch
-                        if ch == "R":
-                            break
-                    break
-        # Restore cursor
-        sys.stdout.write("\x1b[u")
-        sys.stdout.flush()
+            buf = ""
+            start = time.monotonic()
+            while time.monotonic() - start < timeout:
+                if os.read(fd, 1) == b"\x1b":
+                    if os.read(fd, 1) == b"[":
+                        while True:
+                            ch = os.read(fd, 1).decode()
+                            buf += ch
+                            if ch == "R":
+                                break
+                        break
+            # Restore cursor
+            sys.stdout.write("\x1b[u")
+            sys.stdout.flush()
 
-        if buf:
-            buf = buf.rstrip("R")
-            rows, cols = map(int, buf.split(";"))
-            return [rows, cols]
-    except Exception:
-        pass
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    return [24, 80]
+            if buf:
+                buf = buf.rstrip("R")
+                rows, cols = map(int, buf.split(";"))
+                res = cur.copy()
+                cur.clear()
+                cur += [rows, cols]
+                continue
+        except Exception:
+            pass
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        cur = [24, 80]
 
 
 def lw(text: list, width: int = None) -> list:
@@ -315,53 +328,80 @@ def message(
             print(line)
         return
 
+    ok = False
     while True:
         try:
             text = [subline for line in text for subline in line.split("\n")]
-            maxy, maxx = detect_size()
-
-            # Calculate layout
-            content_x, content_width, sidebar_width = _calculate_layout(maxx, sidebar)
-            content_height = maxy - 5  # borders + label + prompt
-
-            text = lw(text, content_width)
+            cached = [0, 0]
+            content_x = None
+            content_width = None
+            sidebar_width = None
+            content_height = None
             scroll = 0
-
             while True:
-                stdscr.clear()
-                draw_border()
+                maxy, maxx = detect_size()
+                if [maxy, maxx] != cached:
+                    cached = [maxy, maxx]
+                    # Calculate layout
+                    content_x, content_width, sidebar_width = _calculate_layout(
+                        maxx, sidebar
+                    )
+                    content_height = maxy - 5  # borders + label + prompt
 
-                # Draw sidebar
-                _draw_sidebar(stdscr, sidebar, sidebar_width, maxx, maxy)
+                    try:
+                        text = lw(text, content_width)
+                        scroll = 0
 
-                # Title always stays at original position (column 2)
-                stdscr.addstr(
-                    1,
-                    2,
-                    label + (" (DRYRUN)" if DRYRUN else ""),
-                    curses.A_BOLD | curses.A_UNDERLINE,
-                )
+                        stdscr.clear()
+                        stdscr.addstr(
+                            1,
+                            2,
+                            label + (" (DRYRUN)" if DRYRUN else ""),
+                            curses.A_BOLD | curses.A_UNDERLINE,
+                        )
+                    except:
+                        cached = [0, 0]
+                        continue
 
-                visible_lines = text[scroll : scroll + content_height]
-                for i, line in enumerate(visible_lines):
-                    stdscr.addstr(3 + i, content_x, line[:content_width])
+                try:
+                    for i in range(content_height):
+                        clear_line(3 + i)
 
-                if not prompt:
+                    visible_lines = text[scroll : scroll + content_height]
+                    for i, line in enumerate(visible_lines):
+                        stdscr.addstr(3 + i, content_x, line[:content_width])
+
+                    if not prompt:
+                        draw_border()
+                        _draw_sidebar(stdscr, sidebar, sidebar_width, maxx, maxy)
+                        refresh()
+                        return
+
+                    clear_line(maxy - 2)
+
+                    draw_border()
+                    _draw_sidebar(stdscr, sidebar, sidebar_width, maxx, maxy)
+
+                    stdscr.attron(curses.A_REVERSE)
+                    stdscr.addstr(
+                        maxy - 2,
+                        content_x,
+                        (
+                            " SCROLL DOWN --"
+                            if scroll + content_height < len(text)
+                            else ""
+                        )
+                        + " Press Enter to continue ",
+                    )
+                    stdscr.attroff(curses.A_REVERSE)
                     refresh()
-                    return
-
-                stdscr.attron(curses.A_REVERSE)
-                stdscr.addstr(
-                    maxy - 2,
-                    content_x,
-                    (" SCROLL DOWN --" if scroll + content_height < len(text) else "")
-                    + " Press Enter to continue ",
-                )
-                stdscr.attroff(curses.A_REVERSE)
-                refresh()
+                except:
+                    cached = [0, 0]
+                    break
 
                 key = stdscr.getch()
                 if key in (ord("\n"), curses.KEY_ENTER):
+                    ok = True
                     break
                 elif key in (curses.KEY_DOWN, ord("s"), ord("S")):
                     if scroll + content_height < len(text):
@@ -371,118 +411,135 @@ def message(
                         scroll -= 1
 
             wait_clear()
-            return
+            if ok:
+                return
         except KeyboardInterrupt:
             pass
         except:
             pass
 
 
-def confirm(text: list, label: str = None, sidebar: dict = None) -> bool:
+def confirm(
+    text: list, label: str = None, sidebar: dict = None, important: bool = True
+) -> bool:
     global NOCONFIRM
     if NOCONFIRM:
         return True
     if label is None:
         label = APP_NAME
+
+    if stdscr is None:
+        for line in text:
+            print(line)
+        while True:
+            try:
+                dat = input("(Y/N)> ")
+                if dat in ["y", "Y"]:
+                    return True
+                elif dat in ["n", "N"]:
+                    return False
+            except (KeyboardInterrupt, EOFError):
+                print()
+                return False
+
+    original_text = [subline for line in text for subline in line.split("\n")]
+
     while True:
         try:
-            if stdscr is None:
-                for line in text:
-                    print(line)
-
-                while True:
-                    try:
-                        dat = input("(Y/N)> ")
-                        if dat in ["y", "Y"]:
-                            return True
-                        elif dat in ["n", "N"]:
-                            return False
-                    except (KeyboardInterrupt, EOFError):
-                        print()
-
-                return False  # Magical fallthrough
-
-            text = [subline for line in text for subline in line.split("\n")]
-            maxy, maxx = detect_size()
-
-            # Calculate layout
-            content_x, content_width, sidebar_width = _calculate_layout(maxx, sidebar)
-            content_height = maxy - 5  # space for borders, label, and prompt
-
+            work_text = original_text.copy()
+            cached = [0, 0]
+            content_x = None
+            content_width = None
+            sidebar_width = None
+            content_height = None
             scroll = 0
             sel = None
 
             while True:
-                stdscr.clear()
-                draw_border()
-
-                # Draw sidebar
-                _draw_sidebar(stdscr, sidebar, sidebar_width, maxx, maxy)
-
-                # Title always stays at original position (column 2)
-                stdscr.addstr(
-                    1,
-                    2,
-                    label + (" (DRYRUN)" if DRYRUN else ""),
-                    curses.A_BOLD | curses.A_UNDERLINE,
-                )
-
-                visible_lines = text[scroll : scroll + content_height]
-                for i, line in enumerate(visible_lines):
-                    stdscr.addstr(3 + i, content_x, line[:content_width])
-
-                stdscr.attron(curses.A_REVERSE)
-                if sel is True:
-                    prompt_line = (
-                        " Confirm (Y/N): Y | "
-                        + (
-                            " SCROLL DOWN --"
-                            if scroll + content_height < len(text)
-                            else ""
-                        )
-                        + " Press enter to continue "
+                maxy, maxx = detect_size()
+                if [maxy, maxx] != cached:
+                    clear()
+                    cached = [maxy, maxx]
+                    content_x, content_width, sidebar_width = _calculate_layout(
+                        maxx, sidebar
                     )
-                elif sel is False:
-                    prompt_line = (
-                        " Confirm (Y/N): N | "
-                        + (
-                            " SCROLL DOWN --"
-                            if scroll + content_height < len(text)
-                            else ""
+                    content_height = maxy - 5
+
+                    try:
+                        work_text = lw(work_text, content_width)
+                        scroll = 0
+                        stdscr.clear()
+                        stdscr.addstr(
+                            1,
+                            2,
+                            label + (" (DRYRUN)" if DRYRUN else ""),
+                            curses.A_BOLD | curses.A_UNDERLINE,
                         )
-                        + " Press enter to continue "
-                    )
-                else:
-                    prompt_line = " Confirm (Y/N): "
-                stdscr.addstr(maxy - 2, content_x, prompt_line)
-                stdscr.attroff(curses.A_REVERSE)
-
-                refresh()
-                try:
-                    key = stdscr.getch()
-                except KeyboardInterrupt:
-                    pass
-
-                if key == ord("\n"):
-                    if sel is not None and scroll + content_height >= len(text):
+                    except:
+                        cached = [0, 0]
                         break
+
+                try:
+                    for i in range(content_height):
+                        clear_line(3 + i)
+                    visible_lines = work_text[scroll : scroll + content_height]
+                    for i, line in enumerate(visible_lines):
+                        stdscr.addstr(3 + i, content_x, line[:content_width])
+
+                    clear_line(maxy - 2)
+                    stdscr.attron(curses.A_REVERSE)
+
+                    prompt_line = ""
+                    if sel is True:
+                        prompt_line = " Confirm (Y/N): Y | "
+                    elif sel is False:
+                        prompt_line = " Confirm (Y/N): N | "
+                    else:
+                        prompt_line = " Confirm (Y/N): "
+
+                    if scroll + content_height < len(work_text):
+                        prompt_line += " SCROLL DOWN --"
+
+                    if sel is not None:
+                        prompt_line += " Press enter to continue "
+
+                    stdscr.addstr(maxy - 2, content_x, prompt_line)
+                    stdscr.attroff(curses.A_REVERSE)
+
+                    draw_border()
+                    _draw_sidebar(stdscr, sidebar, sidebar_width, maxx, maxy)
+                    stdscr.move((maxy - 2), content_x + len(prompt_line))
+                    refresh()
+                except:
+                    cached = [0, 0]
+                    break
+
+                key = stdscr.getch()
+
+                if key in (ord("\n"), curses.KEY_ENTER):
+                    if sel is not None and scroll + content_height >= len(work_text):
+                        wait_clear()
+                        return sel
                 elif key in (curses.KEY_DOWN, ord("s"), ord("S")):
-                    if scroll + content_height < len(text):
+                    if scroll + content_height < len(work_text):
                         scroll += 1
                 elif key in (curses.KEY_UP, ord("w"), ord("W")):
                     if scroll > 0:
                         scroll -= 1
                 elif key in [ord("y"), ord("Y")]:
+                    if not important:
+                        wait_clear()
+                        return True
                     if sel is not True:
                         sel = True
                 elif key in [ord("n"), ord("N")]:
+                    if not important:
+                        wait_clear()
+                        return False
                     if sel is not False:
                         sel = False
                 elif sel is not None:
                     sel = None
-
-            wait_clear()
-            return sel
         except KeyboardInterrupt:
             pass
         except:
@@ -496,141 +553,195 @@ def selector(
     preselect: int | list = -1,
     sidebar: dict = None,
 ) -> list | int:
-    search_query = ""
+    selected = [False] * len(items)
+    idx = 0
+    offset = 0
+
+    if isinstance(preselect, int):
+        if preselect != -1:
+            selected[preselect] = True
+            idx = preselect
+    else:
+        for i in preselect:
+            selected[i] = True
+
     while True:
         try:
-            curses.curs_set(0)
-            selected = [False] * len(items)
-            idx = 0
-            offset = 0
-            if isinstance(preselect, int):
-                if preselect != -1:
-                    selected[preselect] = True
-                    idx = preselect
-            else:
-                for i in preselect:
-                    selected[i] = True
-            start_y = 3
-            h, w = detect_size()
-
-            while h < 5 or w < 60:
-                message([f"Terminal too small {h}<5||{w}<60"], "Error", prompt=False)
-                time.sleep(0.5)
-                h, w = detect_size()
-
-            # Calculate layout
-            content_x, content_width, sidebar_width = _calculate_layout(w, sidebar)
-            view_h = h - start_y - 3
-
-            def draw() -> list[tuple[int, str]]:
-                stdscr.clear()
-                h, w = detect_size()
-                draw_border()
-
-                # Draw sidebar
-                _draw_sidebar(stdscr, sidebar, sidebar_width, w, h)
-
-                # Title always stays at original position (column 2)
-                if label:
-                    stdscr.addstr(
-                        1,
-                        2,
-                        label + (" (DRYRUN)" if DRYRUN else ""),
-                        curses.A_BOLD | curses.A_UNDERLINE,
-                    )
-
-                # Bottom help text - positioned based on content area
-                stdscr.addstr(
-                    h - 2, content_x, "<SPACE>", curses.A_BOLD | curses.A_REVERSE
-                )
-                stdscr.addstr(h - 2, content_x + 8, "Select", curses.A_BOLD)
-                stdscr.addstr(
-                    h - 2, content_x + 16, "<ENTER>", curses.A_BOLD | curses.A_REVERSE
-                )
-                stdscr.addstr(h - 2, content_x + 24, "Confirm", curses.A_BOLD)
-                stdscr.addstr(
-                    h - 2, content_x + 33, "<Q>", curses.A_BOLD | curses.A_REVERSE
-                )
-                stdscr.addstr(h - 2, content_x + 37, "Exit", curses.A_BOLD)
-                stdscr.addstr(
-                    h - 2, content_x + 44, "</>", curses.A_BOLD | curses.A_REVERSE
-                )
-                stdscr.addstr(h - 2, content_x + 49, "Search", curses.A_BOLD)
-
-                filtered = [
-                    (i, item)
-                    for i, item in enumerate(items)
-                    if search_query.lower() in item.lower()
-                ]
-
-                nonlocal offset, idx
-                if idx >= len(filtered):
-                    idx = max(0, len(filtered) - 1)
-                if idx < offset:
-                    offset = idx
-                elif idx >= offset + view_h:
-                    offset = idx - view_h + 1
-
-                for view_idx in range(view_h):
-                    view_idx_global = offset + view_idx
-                    if view_idx_global >= len(filtered):
-                        break
-                    item_idx, item_str = filtered[view_idx_global]
-                    y = start_y + view_idx
-                    prefix = (
-                        "- [x]"
-                        if multi and selected[item_idx]
-                        else (
-                            "- [ ]"
-                            if multi
-                            else " <*>" if item_idx == filtered[idx][0] else " < >"
-                        )
-                    )
-                    text = f"{prefix} {item_str}"
-                    attr = (
-                        curses.A_REVERSE
-                        if item_idx == filtered[idx][0]
-                        else curses.A_NORMAL
-                    )
-                    stdscr.addnstr(y, content_x, text, content_width, attr)
-                refresh()
-                return filtered
+            search_query = ""
+            clear()
 
             while True:
-                filtered = draw()
-                if not filtered:
-                    idx = 0
-                key = stdscr.getch()
+                try:
+                    h, w = detect_size()
+                    while h < 5 or w < 75:
+                        message(
+                            [f"Terminal too small {h}<5||{w}<75"], "Error", prompt=False
+                        )
+                        time.sleep(0.5)
+                        h, w = detect_size()
 
-                if key == ord("/"):
-                    q = text_input(
-                        "Search:", prefill=search_query, label=label, sidebar=sidebar
+                    content_x, content_width, sidebar_width = _calculate_layout(
+                        w, sidebar
                     )
-                    if q is None:
-                        search_query = ""
-                    else:
-                        search_query = q
-                    idx = 0
-                    offset = 0
+                    view_h = h - 6  # 1 for title, 3 for items, 2 for help
 
-                elif key == curses.KEY_UP:
-                    idx = (idx - 1) % len(filtered) if filtered else 0
-                elif key == curses.KEY_DOWN:
-                    idx = (idx + 1) % len(filtered) if filtered else 0
-                elif key == ord(" ") and multi and filtered:
-                    selected[filtered[idx][0]] = not selected[filtered[idx][0]]
-                elif key == ord("q"):
-                    return [] if multi else None
-                elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
-                    if multi:
-                        return [i for i, sel in enumerate(selected) if sel]
-                    else:
-                        return filtered[idx][0] if filtered else None
-                elif key == 27:  # ESC
-                    return [] if multi else None
-        except KeyboardInterrupt:
-            pass
-        except:
+                    def draw():
+                        nonlocal idx, offset, h, w, content_x, content_width, sidebar_width, view_h
+
+                        # Title
+                        if label:
+                            clear_line(1)
+                            stdscr.addstr(
+                                1,
+                                2,
+                                label + (" (DRYRUN)" if DRYRUN else ""),
+                                curses.A_BOLD | curses.A_UNDERLINE,
+                            )
+
+                        # Filter items based on search query
+                        filtered = [
+                            (i, item)
+                            for i, item in enumerate(items)
+                            if search_query.lower() in item.lower()
+                        ]
+
+                        # Adjust index and scroll offset
+                        if idx >= len(filtered):
+                            idx = max(0, len(filtered) - 1)
+                        if len(filtered) > 0:
+                            if idx < offset:
+                                offset = idx
+                            elif idx >= offset + view_h:
+                                offset = idx - view_h + 1
+                        else:
+                            offset = 0
+
+                        # Draw items
+                        for view_idx in range(view_h):
+                            line_y = 3 + view_idx
+                            clear_line(line_y)
+                            item_global_idx = offset + view_idx
+                            if item_global_idx < len(filtered):
+                                item_idx, item_str = filtered[item_global_idx]
+
+                                is_selected_in_multi = multi and selected[item_idx]
+                                is_current_item = (
+                                    len(filtered) > 0 and item_idx == filtered[idx][0]
+                                )
+
+                                if multi:
+                                    prefix = (
+                                        "- [x]" if is_selected_in_multi else "- [ ]"
+                                    )
+                                else:
+                                    prefix = " <*>" if is_current_item else " < >"
+
+                                text = f"{prefix} {item_str}"
+                                attr = (
+                                    curses.A_REVERSE
+                                    if is_current_item
+                                    else curses.A_NORMAL
+                                )
+                                stdscr.addnstr(
+                                    line_y, content_x, text, content_width, attr
+                                )
+
+                        # Draw bottom help text
+                        help_y = h - 2
+                        clear_line(help_y)
+                        stdscr.addstr(
+                            help_y,
+                            content_x,
+                            "<SPACE>",
+                            curses.A_BOLD | curses.A_REVERSE,
+                        )
+                        stdscr.addstr(
+                            help_y,
+                            content_x + 8,
+                            "Select" if multi else "",
+                            curses.A_BOLD,
+                        )
+                        stdscr.addstr(
+                            help_y,
+                            content_x + 16,
+                            "<ENTER>",
+                            curses.A_BOLD | curses.A_REVERSE,
+                        )
+                        stdscr.addstr(help_y, content_x + 24, "Confirm", curses.A_BOLD)
+                        stdscr.addstr(
+                            help_y,
+                            content_x + 33,
+                            "<Q>",
+                            curses.A_BOLD | curses.A_REVERSE,
+                        )
+                        stdscr.addstr(help_y, content_x + 37, "Exit", curses.A_BOLD)
+                        stdscr.addstr(
+                            help_y,
+                            content_x + 44,
+                            "</>",
+                            curses.A_BOLD | curses.A_REVERSE,
+                        )
+                        stdscr.addstr(help_y, content_x + 49, "Search", curses.A_BOLD)
+
+                        draw_border()
+                        _draw_sidebar(stdscr, sidebar, sidebar_width, w, h)
+
+                        refresh()
+                        return filtered
+
+                    filtered = draw()
+                    while True:
+                        key = stdscr.getch()
+
+                        if key == curses.KEY_RESIZE:
+                            h, w = detect_size()
+                            stdscr.clear()
+                            content_x, content_width, sidebar_width = _calculate_layout(
+                                w, sidebar
+                            )
+                            view_h = h - 6
+                            while h < 5 or w < 60:
+                                message(
+                                    [f"Terminal too small {h}<5||{w}<60"],
+                                    "Error",
+                                    prompt=False,
+                                )
+                                time.sleep(0.5)
+                                h, w = detect_size()
+                            filtered = draw()
+                            continue
+
+                        if key == ord("/"):
+                            q = text_input(
+                                "Search:",
+                                prefill=search_query,
+                                label=label,
+                                sidebar=sidebar,
+                            )
+                            search_query = q if q is not None else ""
+                            idx, offset = 0, 0
+                        elif key == curses.KEY_UP:
+                            if filtered:
+                                idx = (idx - 1 + len(filtered)) % len(filtered)
+                        elif key == curses.KEY_DOWN:
+                            if filtered:
+                                idx = (idx + 1) % len(filtered)
+                        elif key == ord(" ") and multi and filtered:
+                            selected[filtered[idx][0]] = not selected[filtered[idx][0]]
+                        elif key == ord("q") or key == 27:  # q or ESC
+                            return [] if multi else None
+                        elif key in (curses.KEY_ENTER, 10, 13):
+                            if multi:
+                                return [i for i, s in enumerate(selected) if s]
+                            return filtered[idx][0] if filtered else None
+
+                        filtered = draw()
+
+                except KeyboardInterrupt:
+                    pass
+                except Exception:
+                    break
+        except Exception:
             pass
 
 
@@ -661,49 +772,46 @@ def text_input(
             h, w = detect_size()
 
             def draw() -> None:
-                stdscr.clear()
-
-                # Calculate layout
-                content_x, content_width, sidebar_width = _calculate_layout(w, sidebar)
-
-                # Draw sidebar
-                _draw_sidebar(stdscr, sidebar, sidebar_width, w, h)
-
-                # Title always stays at original position (column 2)
-                if label:
-                    stdscr.addstr(
-                        1,
-                        2,
-                        label + (" (DRYRUN)" if DRYRUN else ""),
-                        curses.A_BOLD | curses.A_UNDERLINE,
-                    )
-                stdscr.addstr(
-                    h - 2, content_x, "<ENTER>", curses.A_BOLD | curses.A_REVERSE
-                )
-                stdscr.addstr(h - 2, content_x + 8, "Confirm", curses.A_BOLD)
-                stdscr.addstr(
-                    h - 2, content_x + 18, "<ESC>", curses.A_BOLD | curses.A_REVERSE
-                )
-                stdscr.addstr(h - 2, content_x + 25, "Cancel", curses.A_BOLD)
-                draw_border()
-
-                for i in range(len(prompt)):
-                    stdscr.addstr(start_y + i, content_x, prompt[i], curses.A_BOLD)
-
                 display = "*" * len(buf) if mask else "".join(buf)
                 line = display.ljust(content_width)
+                clear_line(start_y + len(prompt))
                 stdscr.addstr(
                     start_y + len(prompt),
                     content_x + 2,
-                    line[:content_width],
+                    line[: content_width - 3],
                     curses.A_REVERSE,
                 )
 
+                draw_border()
+                _draw_sidebar(stdscr, sidebar, sidebar_width, w, h)
                 stdscr.move(start_y + len(prompt), content_x + 2 + cursor)
                 refresh()
 
+            # Calculate layout
+            content_x, content_width, sidebar_width = _calculate_layout(w, sidebar)
+
+            # Initial drawing
+            stdscr.clear()
+            if label:
+                stdscr.addstr(
+                    1,
+                    2,
+                    label + (" (DRYRUN)" if DRYRUN else ""),
+                    curses.A_BOLD | curses.A_UNDERLINE,
+                )
+            stdscr.addstr(h - 2, content_x, "<ENTER>", curses.A_BOLD | curses.A_REVERSE)
+            stdscr.addstr(h - 2, content_x + 8, "Confirm", curses.A_BOLD)
+            stdscr.addstr(
+                h - 2, content_x + 18, "<ESC>", curses.A_BOLD | curses.A_REVERSE
+            )
+            stdscr.addstr(h - 2, content_x + 25, "Cancel", curses.A_BOLD)
+
+            for i in range(len(prompt)):
+                stdscr.addstr(start_y + i, content_x, prompt[i], curses.A_BOLD)
+
+            draw()
+
             while True:
-                draw()
                 curses.curs_set(1)
                 key = stdscr.getch()
                 curses.curs_set(0)
@@ -734,6 +842,7 @@ def text_input(
                     if len(buf) < content_width - 4:
                         buf.insert(cursor, chr(key))
                         cursor += 1
+                draw()
         except KeyboardInterrupt:
             pass
         except:
