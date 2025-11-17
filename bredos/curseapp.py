@@ -769,10 +769,47 @@ def text_input(
             buf = list(prefill)
             cursor = len(buf)
             start_y = 3
-            h, w = detect_size()
+            cached = [0, 0]
 
-            def draw() -> None:
+            def draw_all(h, w, content_x, content_width, sidebar_width):
+                clear()
+                # Draw label
+                if label:
+                    stdscr.addstr(
+                        1,
+                        2,
+                        label + (" (DRYRUN)" if DRYRUN else ""),
+                        curses.A_BOLD | curses.A_UNDERLINE,
+                    )
+                # Draw help text
+                stdscr.addstr(
+                    h - 2, content_x, "<ENTER>", curses.A_BOLD | curses.A_REVERSE
+                )
+                stdscr.addstr(h - 2, content_x + 8, "Confirm", curses.A_BOLD)
+                stdscr.addstr(
+                    h - 2, content_x + 18, "<ESC>", curses.A_BOLD | curses.A_REVERSE
+                )
+                stdscr.addstr(h - 2, content_x + 25, "Cancel", curses.A_BOLD)
+
+                # Draw prompt
+                for i, line in enumerate(prompt):
+                    stdscr.addstr(start_y + i, content_x, line, curses.A_BOLD)
+
+                # Draw input field and border/sidebar
+                draw_input_field(h, w, content_x, content_width, sidebar_width)
+
+            def draw_input_field(h, w, content_x, content_width, sidebar_width):
+                nonlocal cursor
                 display = "*" * len(buf) if mask else "".join(buf)
+
+                # Ensure cursor is within buffer bounds
+                cursor = max(0, min(len(buf), cursor))
+
+                # Truncate buffer if it's too long for the new width
+                if len(buf) >= content_width - 3:
+                    buf[:] = buf[: content_width - 4]
+                    cursor = min(cursor, len(buf))
+
                 line = display.ljust(content_width)
                 clear_line(start_y + len(prompt))
                 stdscr.addstr(
@@ -787,36 +824,26 @@ def text_input(
                 stdscr.move(start_y + len(prompt), content_x + 2 + cursor)
                 refresh()
 
-            # Calculate layout
+            h, w = detect_size()
             content_x, content_width, sidebar_width = _calculate_layout(w, sidebar)
-
-            # Initial drawing
-            stdscr.clear()
-            if label:
-                stdscr.addstr(
-                    1,
-                    2,
-                    label + (" (DRYRUN)" if DRYRUN else ""),
-                    curses.A_BOLD | curses.A_UNDERLINE,
-                )
-            stdscr.addstr(h - 2, content_x, "<ENTER>", curses.A_BOLD | curses.A_REVERSE)
-            stdscr.addstr(h - 2, content_x + 8, "Confirm", curses.A_BOLD)
-            stdscr.addstr(
-                h - 2, content_x + 18, "<ESC>", curses.A_BOLD | curses.A_REVERSE
-            )
-            stdscr.addstr(h - 2, content_x + 25, "Cancel", curses.A_BOLD)
-
-            for i in range(len(prompt)):
-                stdscr.addstr(start_y + i, content_x, prompt[i], curses.A_BOLD)
-
-            draw()
+            draw_all(h, w, content_x, content_width, sidebar_width)
+            cached = [h, w]
 
             while True:
                 curses.curs_set(1)
                 key = stdscr.getch()
                 curses.curs_set(0)
 
-                # Calculate current content width for input validation
+                h, w = detect_size()
+                if [h, w] != cached:
+                    content_x, content_width, sidebar_width = _calculate_layout(
+                        w, sidebar
+                    )
+                    draw_all(h, w, content_x, content_width, sidebar_width)
+                    cached = [h, w]
+                    continue
+
+                # Recalculate just in case, though the resize block should handle it.
                 _, content_width, _ = _calculate_layout(w, sidebar)
 
                 if key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
@@ -842,7 +869,8 @@ def text_input(
                     if len(buf) < content_width - 4:
                         buf.insert(cursor, chr(key))
                         cursor += 1
-                draw()
+
+                draw_input_field(h, w, content_x, content_width, sidebar_width)
         except KeyboardInterrupt:
             pass
         except:
