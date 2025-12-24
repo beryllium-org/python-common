@@ -1,5 +1,5 @@
 import time, curses, textwrap, sys
-import termios, tty, os
+import termios, tty, os, qrcode, io
 
 stdscr = None
 NOCONFIRM = False
@@ -743,6 +743,49 @@ def selector(
                     break
         except Exception:
             pass
+
+
+def qr_view(
+    data: str,
+    label: str | None = None,
+    subtitle: str | list | None = None,
+    sidebar: dict = None,
+) -> None:
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+
+    qr.add_data(data)
+    qr.make(fit=True)
+    f = io.StringIO()
+    qr.print_ascii(out=f)
+    qr_str = f.getvalue()
+    f.close()
+    qr_str = qr_str.split("\n")
+
+    if subtitle == None:
+        subtitle = data
+
+    if stdscr is None:
+        for i in range(len(qr_str)):
+            print(qr_str[i])
+        if isinstance(subtitle, str):
+            print(subtitle)
+        elif isinstance(subtitle, list):
+            for i in range(len(subtitle)):
+                print(subtitle[i])
+        else:
+            raise TypeError("Subtitle can only be str or list")
+    else:
+        if isinstance(subtitle, str):
+            message(qr_str + [subtitle], label, sidebar=sidebar)
+        elif isinstance(subtitle, list):
+            message(qr_str + subtitle, label, sidebar=sidebar)
+        else:
+            raise TypeError("Subtitle can only be str or list")
 
 
 def text_input(

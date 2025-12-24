@@ -7,3 +7,7 @@ py -c "from bredos import curseapp as c;c.init();c.selector(['Option A', 'Option
 py -c "from bredos import curseapp as c;c.init();c.text_input('Please enter your name:', label='Text Input', prefill='John Doe', sidebar={'User Info': False});c.suspend()" | pv -q -L 1024
 
 py -c "from bredos import curseapp as c;c.init();c.menu('Main Menu', {'File': lambda: c.message(['File clicked']), 'Edit': lambda: c.message(['Edit clicked']), 'Help': lambda: c.message(['Help clicked'])});c.suspend()" | pv -q -L 1024
+
+py -c "from bredos import curseapp as c;c.init();c.qr_view(\"https://nc.feline.gr/\", \"Pepega\");c.suspend()"
+
+py -c "from bredos import curseapp as c;c.qr_view(\"https://nc.feline.gr/\", \"Pepega\")"

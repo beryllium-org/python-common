@@ -1,9 +1,9 @@
 #Maintainer: Panda <panda@bredos.org>
 
 pkgname=python-bredos-common
-pkgver=1.9.0
+pkgver=1.10.0
 pkgrel=1
-depends=('python>=3.12' 'python-pyrunning' 'python-pysetting' 'pyalpm')
+depends=('python>=3.12' 'python-pyrunning' 'python-pysetting' 'pyalpm' 'python-qrcode')
 url="https://github.com/BredOS/python-common"
 license=('GPLv3')
 arch=('any')
