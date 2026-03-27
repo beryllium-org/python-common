@@ -7,7 +7,6 @@ from glob import glob
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-
 dtcache = {}
 DTB_PATH = None
 PROC_DT = Path("/proc/device-tree")

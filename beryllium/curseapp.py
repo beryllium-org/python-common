@@ -4,13 +4,13 @@ import termios, tty, os, qrcode, io
 stdscr = None
 NOCONFIRM = False
 DRYRUN = False
-APP_NAME = "BredOS"
+APP_NAME = "Beryllium OS"
 enabled = False
 
 # Theming, update from app
-primary = 166  # ANSI 256 Colors
+primary = 45  # ANSI 256 Colors
 primary_fallback = 7  # TTY 8 Colors
-secondary = 166  # ANSI 256 Colors
+secondary = 21  # ANSI 256 Colors
 secondary_fallback = 7  # TTY 8 Colors
 background = None  # ANSI 256 Colors
 background_fallback = 0  # ANSI 8 Colors

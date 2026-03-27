@@ -1,2 +1,2 @@
 # python-common
-Common python funtions for BredOS applications
+Common python funtions for Beryllium applications

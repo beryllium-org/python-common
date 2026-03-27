@@ -1,13 +1,13 @@
-py -c "from bredos import curseapp as c;c.init();c.message(['This is a test message.', 'It can contain multiple lines of text to demonstrate word wrapping and scrolling.', '', '', 'Lines further down', '', 'aaaaaa', 'bbbbbbbbb', 'ccccccccccc'], label='Message Test', sidebar={'Step 1': True, 'Step 2': False, 'Step 3': False});c.suspend()" | pv -q -L 1024
+py -c "from beryllium import curseapp as c;c.init();c.message(['This is a test message.', 'It can contain multiple lines of text to demonstrate word wrapping and scrolling.', '', '', 'Lines further down', '', 'aaaaaa', 'bbbbbbbbb', 'ccccccccccc'], label='Message Test', sidebar={'Step 1': True, 'Step 2': False, 'Step 3': False});c.suspend()" | pv -q -L 1024
 
-py -c "from bredos import curseapp as c;c.init();c.confirm(['This is a confirmation prompt.', 'Are you sure you want to proceed with this very important action?'], label='Confirmation Test', sidebar={'Task A': True, 'Task B': True});c.suspend()" | pv -q -L 1024
+py -c "from beryllium import curseapp as c;c.init();c.confirm(['This is a confirmation prompt.', 'Are you sure you want to proceed with this very important action?'], label='Confirmation Test', sidebar={'Task A': True, 'Task B': True});c.suspend()" | pv -q -L 1024
 
-py -c "from bredos import curseapp as c;c.init();c.selector(['Option A', 'Option B', 'Option C', 'A much longer option to test text clipping'], multi=True, label='Single-Choice Selector', sidebar={'Choice': False});c.suspend()" | pv -q -L 1024
+py -c "from beryllium import curseapp as c;c.init();c.selector(['Option A', 'Option B', 'Option C', 'A much longer option to test text clipping'], multi=True, label='Single-Choice Selector', sidebar={'Choice': False});c.suspend()" | pv -q -L 1024
 
-py -c "from bredos import curseapp as c;c.init();c.text_input('Please enter your name:', label='Text Input', prefill='John Doe', sidebar={'User Info': False});c.suspend()" | pv -q -L 1024
+py -c "from beryllium import curseapp as c;c.init();c.text_input('Please enter your name:', label='Text Input', prefill='John Doe', sidebar={'User Info': False});c.suspend()" | pv -q -L 1024
 
-py -c "from bredos import curseapp as c;c.init();c.menu('Main Menu', {'File': lambda: c.message(['File clicked']), 'Edit': lambda: c.message(['Edit clicked']), 'Help': lambda: c.message(['Help clicked'])});c.suspend()" | pv -q -L 1024
+py -c "from beryllium import curseapp as c;c.init();c.menu('Main Menu', {'File': lambda: c.message(['File clicked']), 'Edit': lambda: c.message(['Edit clicked']), 'Help': lambda: c.message(['Help clicked'])});c.suspend()" | pv -q -L 1024
 
-py -c "from bredos import curseapp as c;c.init();c.qr_view(\"https://nc.feline.gr/\", \"Pepega\");c.suspend()"
+py -c "from beryllium import curseapp as c;c.init();c.qr_view(\"https://nc.feline.gr/\", \"Pepega\");c.suspend()"
 
-py -c "from bredos import curseapp as c;c.qr_view(\"https://nc.feline.gr/\", \"Pepega\")"
+py -c "from beryllium import curseapp as c;c.qr_view(\"https://nc.feline.gr/\", \"Pepega\")"

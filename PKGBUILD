@@ -1,14 +1,17 @@
-#Maintainer: Panda <panda@bredos.org>
+#Maintainer: Bill Sideris <bill88t@feline.gr>
 
-pkgname=python-bredos-common
-pkgver=1.10.0
+pkgname=python-beryllium-common
+pkgver=1.11.0
 pkgrel=2
 depends=('python>=3.12' 'python-pyrunning' 'python-pysetting' 'pyalpm' 'python-qrcode')
-url="https://github.com/BredOS/python-common"
+url="https://github.com/beryllium-org/python-common"
 license=('GPLv3')
 arch=('any')
 makedepends=('python-setuptools' 'python-pipenv')
-pkgdesc="Common python functions used in BredOS applications"
+pkgdesc="Common python functions used in Beryllium applications"
+
+conflicts=('python-bredos-common')
+replaces=('python-bredos-common')
 
 build() {
     cd $srcdir/..
