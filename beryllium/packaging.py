@@ -1,5 +1,5 @@
 #
-# Copyright 2024 BredOS
+# Copyright 2026 Beryllium
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,9 +26,9 @@ from pathlib import Path
 import shlex
 import subprocess
 
-from bredos.utilities import Elevator
+from beryllium.utilities import Elevator
 
-logger = logging.getLogger("bredos.packages")
+logger = logging.getLogger("beryllium.packages")
 handler = logging.StreamHandler()
 formatter = logging.Formatter("%(levelname)s: %(message)s")
 handler.setFormatter(formatter)
