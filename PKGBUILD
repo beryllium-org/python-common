@@ -1,8 +1,8 @@
 #Maintainer: Bill Sideris <bill88t@feline.gr>
 
 pkgname=python-beryllium-common
-pkgver=1.11.0
-pkgrel=2
+pkgver=1.11.1
+pkgrel=1
 depends=('python>=3.12' 'python-pyrunning' 'python-pysetting' 'pyalpm' 'python-qrcode')
 url="https://github.com/beryllium-org/python-common"
 license=('GPLv3')

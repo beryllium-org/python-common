@@ -224,7 +224,11 @@ def gencache() -> dict:
             }
 
             for future in as_completed(futures):
-                result = future.result()
+                try:
+                    result = future.result()
+                except Exception:
+                    # Skip problematic files and keep scanning others.
+                    continue
                 if result:
                     path_str, kind, data = result
                     dtcache[path_str] = data
@@ -266,7 +270,10 @@ def detect_live() -> tuple:
         }
 
         for future in as_completed(futures):
-            result = future.result()
+            try:
+                result = future.result()
+            except Exception:
+                continue
             if result is None:
                 continue
             dtb_relpath, candidate_hash, candidate_dts = result
